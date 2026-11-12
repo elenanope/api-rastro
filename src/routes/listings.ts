@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { ObjectId } from "mongodb";
-import { listingsCollection, usersCollection } from "../db";
+import { listingsCollection, offersCollection, usersCollection } from "../db";
 import type { Filter } from "mongodb";
 import type { Listing } from "../types";
 
@@ -55,6 +55,24 @@ router.get("/:id", async (req, res) => {
     res.json(listing);
 });
 
+router.get("/:id/offers", async (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) {
+        res.status(400).json({ error: "El ID no tiene un formato válido" });
+        return;
+    }
+    const listing = await listingsCollection().findOne({ _id: new ObjectId(req.params.id) });
+    if (!listing) {
+        res.status(404).json({ error: "Anuncio no encontrado" });
+        return;
+    }
+
+    const offers = await offersCollection()
+        .find({ "listing.id": new ObjectId(req.params.id) })
+        .toArray();
+
+    res.json(offers);
+});
+
 async function validateListing(body:
     {
         title: string;
@@ -62,7 +80,7 @@ async function validateListing(body:
         price?: number;
         category: string;
         city: string;
-        sellerId: ObjectId;
+        sellerId: string;
         attributes?: { size?: string, type?: string, wheelInches?: number };
     }): Promise<string | null> {
 
@@ -114,7 +132,7 @@ router.post("/", async (req, res) => {
         city: body.city.trim(),
         publishedAt: new Date(),
         views: 0,
-        seller: { id: body.sellerId.trim(), name: seller.name },
+        seller: { id: new ObjectId(body.sellerId), name: seller.name },
         photos: [],
         attributes: attributes
     };
@@ -125,7 +143,11 @@ router.post("/", async (req, res) => {
 });
 
 router.patch("/:id", async (req, res) => {
-    const price = Number(req.body.price);
+    const price = req.body?.price;
+    if (typeof req.params.id !== "string" || !ObjectId.isValid(req.params.id)) {
+        res.status(400).json({ error: "El id no tiene un formato válido" });
+        return;
+    }
     if (typeof price !== "number" || !Number.isFinite(price) || price < 0) {
         res.status(400).json({ error: "El precio debe ser un número igual o mayor que cero" });
         return;
