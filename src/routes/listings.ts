@@ -64,7 +64,7 @@ async function validateListing(body:
         city: string;
         sellerId: ObjectId;
         attributes?: { size?: string, type?: string, wheelInches?: number };
-    }, partial: boolean): Promise<string | null> {
+    }): Promise<string | null> {
 
         
     if ((typeof body.title !== "string" || body.title.trim() === "")
@@ -88,7 +88,7 @@ async function validateListing(body:
 
 router.post("/", async (req, res) => {
     const body = req.body ?? {};
-    const error = await validateListing(body, false);
+    const error = await validateListing(body);
 
     if (error) {
         res.status(400).json({ error });
