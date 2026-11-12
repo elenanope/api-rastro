@@ -66,7 +66,7 @@ async function validateListing(body:
         attributes?: { size?: string, type?: string, wheelInches?: number };
     }): Promise<string | null> {
 
-        
+
     if ((typeof body.title !== "string" || body.title.trim() === "")
         || (typeof body.description !== "string" || body.description.trim() === "")
         || (typeof body.category !== "string" || body.category.trim() === "")
@@ -85,7 +85,6 @@ async function validateListing(body:
     return null;
 }
 
-
 router.post("/", async (req, res) => {
     const body = req.body ?? {};
     const error = await validateListing(body);
@@ -102,9 +101,9 @@ router.post("/", async (req, res) => {
     }
 
     const attributes =
-    typeof body.attributes === "object" && body.attributes !== null && !Array.isArray(body.attributes)
-    ? body.attributes
-    : {};
+        typeof body.attributes === "object" && body.attributes !== null && !Array.isArray(body.attributes)
+            ? body.attributes
+            : {};
 
     const newListing: Listing = {
         title: body.title.trim(),
@@ -117,12 +116,45 @@ router.post("/", async (req, res) => {
         views: 0,
         seller: { id: body.sellerId.trim(), name: seller.name },
         photos: [],
-        attributes:  attributes
+        attributes: attributes
     };
 
     const result = await listingsCollection().insertOne(newListing);
 
     res.status(201).json({ _id: result.insertedId, ...newListing });
+});
+
+router.patch("/:id", async (req, res) => {
+    const price = Number(req.body.price);
+    if (typeof price !== "number" || !Number.isFinite(price) || price < 0) {
+        res.status(400).json({ error: "El precio debe ser un número igual o mayor que cero" });
+        return;
+    }
+    const listing = await listingsCollection()
+        .findOneAndUpdate({ _id: new ObjectId(req.params.id) }, { $set: { price: price } }, { returnDocument: "after" });
+
+    if (!listing) {
+        res.status(404).json({ error: "Anuncio no encontrado" });
+        return;
+    }
+
+    res.json(listing);
+});
+
+router.delete("/:id", async (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) {
+        res.status(400).json({ error: "El ID no tiene un formato válido" });
+        return;
+    }
+    const result = await listingsCollection()
+        .deleteOne({ _id: new ObjectId(req.params.id) });
+
+    if (result.deletedCount === 0) {
+        res.status(404).json({ error: "Anuncio no encontrado" });
+        return;
+    }
+
+    res.status(204).send();
 });
 
 export default router;
