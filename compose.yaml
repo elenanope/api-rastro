@@ -1,0 +1,14 @@
+services:
+  mongodb:
+    image: mongo:8                      # MongoDB 8
+    container_name: practica-api-rastro-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin          # usuario
+      MONGO_INITDB_ROOT_PASSWORD: admin_dev_123  # contraseña (solo para practicar)
+    ports:
+      - "27017:27017"                   # el puerto de MongoDB
+    volumes:
+      - mongodb_data:/data/db           # para que los datos no se pierdan
+
+volumes:
+  mongodb_data:
