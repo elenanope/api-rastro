@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { ObjectId } from "mongodb";
-import { listingsCollection } from "../db";
+import { listingsCollection, usersCollection } from "../db";
 import type { Filter } from "mongodb";
 import type { Listing } from "../types";
 
@@ -21,7 +21,7 @@ router.get("/", async (req, res) => {
         filter.city = req.query.city;
     }
 
-    if (typeof req.query.maxPrice === "string" && req.query.maxPrice !== "" ) {
+    if (typeof req.query.maxPrice === "string" && req.query.maxPrice !== "") {
         const maxPrice = Number(req.query.maxPrice);
         if (!Number.isFinite(maxPrice) || maxPrice < 0) {
             res.status(400).json({ error: "El precio máximo debe ser un número válido" });
@@ -53,6 +53,76 @@ router.get("/:id", async (req, res) => {
     }
 
     res.json(listing);
+});
+
+async function validateListing(body:
+    {
+        title: string;
+        description: string;
+        price?: number;
+        category: string;
+        city: string;
+        sellerId: ObjectId;
+        attributes?: { size?: string, type?: string, wheelInches?: number };
+    }, partial: boolean): Promise<string | null> {
+
+        
+    if ((typeof body.title !== "string" || body.title.trim() === "")
+        || (typeof body.description !== "string" || body.description.trim() === "")
+        || (typeof body.category !== "string" || body.category.trim() === "")
+        || (typeof body.city !== "string" || body.city.trim() === "")
+    ) {
+        return "Los campos title, description, category y city deben ser textos no vacíos";
+    }
+
+    if (typeof body.price !== "number" || !Number.isFinite(body.price) || body.price < 0) {
+        return "El precio debe ser un número igual o mayor que cero";
+    }
+
+    if (typeof body.sellerId !== "string" || !ObjectId.isValid(body.sellerId)) {
+        return "sellerId no tiene un formato válido";
+    }
+    return null;
+}
+
+
+router.post("/", async (req, res) => {
+    const body = req.body ?? {};
+    const error = await validateListing(body, false);
+
+    if (error) {
+        res.status(400).json({ error });
+        return;
+    }
+
+    const seller = await usersCollection().findOne({ _id: new ObjectId(body.sellerId) });
+    if (!seller) {
+        res.status(400).json({ error: "No existe ningún usuario con ese sellerId" });
+        return;
+    }
+
+    const attributes =
+    typeof body.attributes === "object" && body.attributes !== null && !Array.isArray(body.attributes)
+    ? body.attributes
+    : {};
+
+    const newListing: Listing = {
+        title: body.title.trim(),
+        description: body.description.trim(),
+        price: body.price,
+        category: body.category.trim(),
+        status: "AVAILABLE",
+        city: body.city.trim(),
+        publishedAt: new Date(),
+        views: 0,
+        seller: { id: body.sellerId.trim(), name: seller.name },
+        photos: [],
+        attributes:  attributes
+    };
+
+    const result = await listingsCollection().insertOne(newListing);
+
+    res.status(201).json({ _id: result.insertedId, ...newListing });
 });
 
 export default router;
